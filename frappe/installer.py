@@ -38,16 +38,22 @@ def _new_site(
 		db_name = "_" + hashlib.sha1(site.encode()).hexdigest()[:16]
 
 	frappe.init(site=site)
-        
+
+	try:
+		# enable scheduler post install?
+		enable_scheduler = _is_scheduler_enabled()
+	except Exception:
+		enable_scheduler = False
+
+	make_site_dirs()
+
+	installing = touch_file(get_site_path("locks", "installing.lock"))
+
 	if not force and os.path.exists(site):
 		print("Site {0} already exists".format(site))
 		print("Ion: Apps that do not exist will be installed")
 
 	else:
-
-		from frappe.commands.scheduler import _is_scheduler_enabled
-		from frappe.utils import get_site_path, scheduler, touch_file
-
 		install_db(
 			root_login=mariadb_root_username,
 			root_password=mariadb_root_password,
