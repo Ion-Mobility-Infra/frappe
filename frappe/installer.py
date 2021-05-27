@@ -48,16 +48,6 @@ def _new_site(
 		from frappe.commands.scheduler import _is_scheduler_enabled
 		from frappe.utils import get_site_path, scheduler, touch_file
 
-		try:
-			# enable scheduler post install?
-			enable_scheduler = _is_scheduler_enabled()
-		except Exception:
-			enable_scheduler = False
-
-		make_site_dirs()
-
-		installing = touch_file(get_site_path("locks", "installing.lock"))
-
 		install_db(
 			root_login=mariadb_root_username,
 			root_password=mariadb_root_password,
@@ -73,14 +63,26 @@ def _new_site(
 			db_port=db_port,
 			no_mariadb_socket=no_mariadb_socket,
 		)
+	
+	try:
+		# enable scheduler post install?
+		enable_scheduler = _is_scheduler_enabled()
+	except Exception:
+		enable_scheduler = False
+
+	make_site_dirs()
+
+	installing = touch_file(get_site_path("locks", "installing.lock"))
+
 	apps_to_install = (
 		["frappe"] + (frappe.conf.get("install_apps") or []) + (list(install_apps) or [])
 	)
 
 	for app in apps_to_install:
 		install_app(app, verbose=verbose, set_as_patched=not source_sql)
-
-	os.remove(installing)
+	
+	if 'installing' in locals():
+		os.remove(installing)
 
 	scheduler.toggle_scheduler(enable_scheduler)
 	frappe.db.commit()
