@@ -28,11 +28,7 @@ def _new_site(
 	new_site=False,
 ):
 	"""Install a new Frappe site"""
-
-	if not force and os.path.exists(site):
-		print("Site {0} already exists".format(site))
-		sys.exit(1)
-
+	
 	if no_mariadb_socket and not db_type == "mariadb":
 		print("--no-mariadb-socket requires db_type to be set to mariadb.")
 		sys.exit(1)
@@ -43,34 +39,40 @@ def _new_site(
 
 	frappe.init(site=site)
 
-	from frappe.commands.scheduler import _is_scheduler_enabled
-	from frappe.utils import get_site_path, scheduler, touch_file
+	if not force and os.path.exists(site):
+        print("Site {0} already exists".format(site))
+        print("Ion: Apps that do not exist will be installed")
 
-	try:
-		# enable scheduler post install?
-		enable_scheduler = _is_scheduler_enabled()
-	except Exception:
-		enable_scheduler = False
+	else:
 
-	make_site_dirs()
+		from frappe.commands.scheduler import _is_scheduler_enabled
+		from frappe.utils import get_site_path, scheduler, touch_file
 
-	installing = touch_file(get_site_path("locks", "installing.lock"))
+		try:
+			# enable scheduler post install?
+			enable_scheduler = _is_scheduler_enabled()
+		except Exception:
+			enable_scheduler = False
 
-	install_db(
-		root_login=mariadb_root_username,
-		root_password=mariadb_root_password,
-		db_name=db_name,
-		admin_password=admin_password,
-		verbose=verbose,
-		source_sql=source_sql,
-		force=force,
-		reinstall=reinstall,
-		db_password=db_password,
-		db_type=db_type,
-		db_host=db_host,
-		db_port=db_port,
-		no_mariadb_socket=no_mariadb_socket,
-	)
+		make_site_dirs()
+
+		installing = touch_file(get_site_path("locks", "installing.lock"))
+
+		install_db(
+			root_login=mariadb_root_username,
+			root_password=mariadb_root_password,
+			db_name=db_name,
+			admin_password=admin_password,
+			verbose=verbose,
+			source_sql=source_sql,
+			force=force,
+			reinstall=reinstall,
+			db_password=db_password,
+			db_type=db_type,
+			db_host=db_host,
+			db_port=db_port,
+			no_mariadb_socket=no_mariadb_socket,
+		)
 	apps_to_install = (
 		["frappe"] + (frappe.conf.get("install_apps") or []) + (list(install_apps) or [])
 	)
