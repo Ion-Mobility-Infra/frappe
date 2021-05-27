@@ -40,8 +40,8 @@ def _new_site(
 	frappe.init(site=site)
 
 	if not force and os.path.exists(site):
-        print("Site {0} already exists".format(site))
-        print("Ion: Apps that do not exist will be installed")
+            print("Site {0} already exists".format(site))
+            print("Ion: Apps that do not exist will be installed")
 
 	else:
 
