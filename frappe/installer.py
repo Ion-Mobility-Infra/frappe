@@ -33,13 +33,7 @@ def _new_site(
 		print("Site {0} already exists".format(site))
 		print("Ion: Installer will attempt to install uninstalled apps")
 		
-		from frappe.commands.scheduler import _is_scheduler_enabled
 		from frappe.utils import get_site_path, scheduler, touch_file
-		try:
-			# enable scheduler post install?
-			enable_scheduler = _is_scheduler_enabled()
-		except Exception:
-			enable_scheduler = False
 		installing = touch_file(get_site_path("locks", "installing.lock"))
 		
 		apps_to_install = (
@@ -51,6 +45,7 @@ def _new_site(
 
 		os.remove(installing)
 
+		enable_scheduler = True
 		scheduler.toggle_scheduler(enable_scheduler)
 		frappe.db.commit()
 
