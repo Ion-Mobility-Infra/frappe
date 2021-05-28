@@ -33,9 +33,10 @@ def _new_site(
 		print("Site {0} already exists".format(site))
 		print("Ion: Installer will attempt to install uninstalled apps")
 		
+		make_site_dirs()
 		from frappe.utils import get_site_path, scheduler, touch_file
 		installing = touch_file(get_site_path("locks", "installing.lock"))
-		
+	
 		apps_to_install = (
 			["frappe"] + (frappe.conf.get("install_apps") or []) + (list(install_apps) or [])
 		)
