@@ -28,7 +28,40 @@ def _new_site(
 	new_site=False,
 ):
 	"""Install a new Frappe site"""
-	
+
+	if not force and os.path.exists(site):
+		print("Site {0} already exists".format(site))
+		print("Ion: Installer will attempt to install uninstalled apps")
+		
+		from frappe.commands.scheduler import _is_scheduler_enabled
+		from frappe.utils import get_site_path, scheduler, touch_file
+		try:
+			# enable scheduler post install?
+			enable_scheduler = _is_scheduler_enabled()
+		except Exception:
+			enable_scheduler = False
+		installing = touch_file(get_site_path("locks", "installing.lock"))
+		
+		apps_to_install = (
+			["frappe"] + (frappe.conf.get("install_apps") or []) + (list(install_apps) or [])
+		)
+
+		for app in apps_to_install:
+			install_app(app, verbose=verbose, set_as_patched=not source_sql)
+
+		os.remove(installing)
+
+		scheduler.toggle_scheduler(enable_scheduler)
+		frappe.db.commit()
+
+		scheduler_status = (
+			"disabled" if frappe.utils.scheduler.is_scheduler_disabled() else "enabled"
+		)
+		print("*** Scheduler is", scheduler_status, "***")
+		
+		
+		return
+
 	if no_mariadb_socket and not db_type == "mariadb":
 		print("--no-mariadb-socket requires db_type to be set to mariadb.")
 		sys.exit(1)
@@ -39,6 +72,9 @@ def _new_site(
 
 	frappe.init(site=site)
 
+	from frappe.commands.scheduler import _is_scheduler_enabled
+	from frappe.utils import get_site_path, scheduler, touch_file
+
 	try:
 		# enable scheduler post install?
 		enable_scheduler = _is_scheduler_enabled()
@@ -49,46 +85,29 @@ def _new_site(
 
 	installing = touch_file(get_site_path("locks", "installing.lock"))
 
-	if not force and os.path.exists(site):
-		print("Site {0} already exists".format(site))
-		print("Ion: Apps that do not exist will be installed")
-
-	else:
-		install_db(
-			root_login=mariadb_root_username,
-			root_password=mariadb_root_password,
-			db_name=db_name,
-			admin_password=admin_password,
-			verbose=verbose,
-			source_sql=source_sql,
-			force=force,
-			reinstall=reinstall,
-			db_password=db_password,
-			db_type=db_type,
-			db_host=db_host,
-			db_port=db_port,
-			no_mariadb_socket=no_mariadb_socket,
-		)
-	
-	try:
-		# enable scheduler post install?
-		enable_scheduler = _is_scheduler_enabled()
-	except Exception:
-		enable_scheduler = False
-
-	make_site_dirs()
-
-	installing = touch_file(get_site_path("locks", "installing.lock"))
-
+	install_db(
+		root_login=mariadb_root_username,
+		root_password=mariadb_root_password,
+		db_name=db_name,
+		admin_password=admin_password,
+		verbose=verbose,
+		source_sql=source_sql,
+		force=force,
+		reinstall=reinstall,
+		db_password=db_password,
+		db_type=db_type,
+		db_host=db_host,
+		db_port=db_port,
+		no_mariadb_socket=no_mariadb_socket,
+	)
 	apps_to_install = (
 		["frappe"] + (frappe.conf.get("install_apps") or []) + (list(install_apps) or [])
 	)
 
 	for app in apps_to_install:
 		install_app(app, verbose=verbose, set_as_patched=not source_sql)
-	
-	if 'installing' in locals():
-		os.remove(installing)
+
+	os.remove(installing)
 
 	scheduler.toggle_scheduler(enable_scheduler)
 	frappe.db.commit()
@@ -259,7 +278,7 @@ def remove_app(app_name, dry_run=False, yes=False, no_backup=False, force=False)
 		linked_doctypes = frappe.get_all(
 			"DocField", filters={"fieldtype": "Link", "options": "Module Def"}, fields=["parent"]
 		)
-		ordered_doctypes = ["Desk Page", "Report", "Page", "Web Form"]
+		ordered_doctypes = ["Workspace", "Report", "Page", "Web Form"]
 		all_doctypes_with_linked_modules = ordered_doctypes + [
 			doctype.parent
 			for doctype in linked_doctypes
@@ -400,19 +419,16 @@ def get_conf_params(db_name=None, db_password=None):
 
 
 def make_site_dirs():
-	site_public_path = os.path.join(frappe.local.site_path, 'public')
-	site_private_path = os.path.join(frappe.local.site_path, 'private')
-	for dir_path in (
-			os.path.join(site_private_path, 'backups'),
-			os.path.join(site_public_path, 'files'),
-			os.path.join(site_private_path, 'files'),
-			os.path.join(frappe.local.site_path, 'logs'),
-			os.path.join(frappe.local.site_path, 'task-logs')):
-		if not os.path.exists(dir_path):
-			os.makedirs(dir_path)
-	locks_dir = frappe.get_site_path('locks')
-	if not os.path.exists(locks_dir):
-			os.makedirs(locks_dir)
+	for dir_path in [
+		os.path.join("public", "files"),
+		os.path.join("private", "backups"),
+		os.path.join("private", "files"),
+		"error-snapshots",
+		"locks",
+		"logs",
+	]:
+		path = frappe.get_site_path(dir_path)
+		os.makedirs(path, exist_ok=True)
 
 
 def add_module_defs(app):
@@ -612,3 +628,4 @@ def validate_database_sql(path, _raise=True):
 
 	if _raise and (missing_table or empty_file):
 		raise frappe.InvalidDatabaseFile
+
